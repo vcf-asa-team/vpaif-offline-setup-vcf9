@@ -1,0 +1,553 @@
+formatVersion: 2
+metadata:
+  deploymentSettings:
+    disableUpdateDay2Action: true
+    hideDisabledDay2Actions: true
+inputs:
+  namespaceName:
+    type: string
+    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+    maxLength: 63
+    minLength: 1
+  ngcPortalAccessKey:
+    type: string
+    encrypted: false
+    description: NVIDIA GPU AI enterprise API key
+    default: nokey
+  controlPlaneCount:
+    type: integer
+    title: Control plane node count
+    description: Control plane node count
+    default: 1
+    enum:
+      - 1
+      - 3
+  workerCount:
+    type: integer
+    title: Worker node count
+    description: Worker node count
+    default: 1
+    enum:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+      - 15
+      - 16
+  controlPlaneVmClassName:
+    type: string
+    title: Control Plane VM Class
+    description: Control Plane Virtual Machine Class Name
+    oneOf:
+      - title: best-effort-2xlarge - 8 CPUs and 64 GB memory
+        const: best-effort-2xlarge
+      - title: best-effort-4xlarge - 16 CPUs and 128 GB memory
+        const: best-effort-4xlarge
+      - title: best-effort-8xlarge - 32 CPUs and 128 GB memory
+        const: best-effort-8xlarge
+      - title: best-effort-large - 4 CPUs and 16 GB memory
+        const: best-effort-large
+      - title: best-effort-medium - 2 CPUs and 8 GB memory
+        const: best-effort-medium
+      - title: best-effort-small - 2 CPUs and 4 GB memory
+        const: best-effort-small
+      - title: best-effort-xlarge - 4 CPUs and 32 GB memory
+        const: best-effort-xlarge
+      - title: best-effort-xsmall - 2 CPUs and 2 GB memory
+        const: best-effort-xsmall
+      - title: guaranteed-2xlarge - 8 CPUs and 64 GB memory
+        const: guaranteed-2xlarge
+      - title: guaranteed-4xlarge - 16 CPUs and 128 GB memory
+        const: guaranteed-4xlarge
+    default: best-effort-large
+  workerVmClassName:
+    type: string
+    title: Worker VM Class
+    description: Worker Virtual Machine Class Name
+    oneOf:
+      - title: gpu-large - 1 vGPU(48 GB), 8 CPUs and 62 GB memory
+        const: gpu-large
+      - title: gpu-small - 1 vGPU(4 GB), 4 CPUs and 20 GB memory
+        const: gpu-small
+    default: gpu-small
+resources:
+  cciNamespace:
+    type: CCI.Supervisor.Namespace
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: ${input.namespaceName}
+      regionName: private-ai-foundation-ykw661ag
+      className: vpaif-quickstart-3
+  tkg:
+    type: CCI.Supervisor.Resource
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      context: ${resource.cciNamespace.id}
+      manifest:
+        kind: Cluster
+        apiVersion: cluster.x-k8s.io/v1beta1
+        metadata:
+          name: kubernetes-cluster
+          labels:
+            tkg-cluster-selector: kubernetes-cluster
+        spec:
+          clusterNetwork:
+            services:
+              cidrBlocks:
+                - 198.51.100.0/12
+            pods:
+              cidrBlocks:
+                - 192.0.2.0/16
+            serviceDomain: cluster.local
+          topology:
+            class: tanzukubernetescluster
+            version: v1.30.1---vmware.1-fips-tkg.5
+            variables:
+              - name: vmClass
+                value: ${input.controlPlaneVmClassName}
+              - name: storageClass
+                value: ${propgroup.vpaif_ag_properties.storageClass}
+              - name: defaultStorageClass
+                value: ${propgroup.vpaif_ag_properties.storageClass}
+              - name: nodePoolLabels
+                value: []
+              - name: nodePoolTaints
+                value: []
+              - name: nodePoolVolumes
+                value:
+                  - capacity:
+                      storage: 200Gi
+                    mountPath: /var/lib/containerd
+                    name: containerd
+                    storageClass: ${propgroup.vpaif_ag_properties.storageClass}
+                  - capacity:
+                      storage: 200Gi
+                    mountPath: /var/lib/kubelet
+                    name: kubelet
+                    storageClass: ${propgroup.vpaif_ag_properties.storageClass}
+            controlPlane:
+              metadata:
+                annotations:
+                  run.tanzu.vmware.com/resolve-os-image: os-name=ubuntu
+              replicas: ${input.controlPlaneCount}
+            workers:
+              machineDeployments:
+                - class: node-pool
+                  metadata:
+                    annotations:
+                      run.tanzu.vmware.com/resolve-os-image: os-name=ubuntu
+                  name: worker
+                  replicas: ${input.workerCount}
+                  variables:
+                    overrides:
+                      - name: vmClass
+                        value: ${input.workerVmClassName}
+  tkgClusterBootstrap:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - tkg
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    createTimeout: 45m
+    properties:
+      context: ${resource.cciNamespace.id}
+      existing: true
+      manifest:
+        apiVersion: run.tanzu.vmware.com/v1alpha3
+        kind: ClusterBootstrap
+        metadata:
+          name: kubernetes-cluster
+      wait:
+        conditions:
+          - indicatesFailure: false
+            status: 'True'
+            type: Antrea-ReconcileSucceeded
+          - indicatesFailure: false
+            status: 'True'
+            type: Guest-Cluster-Auth-Service-ReconcileSucceeded
+          - indicatesFailure: false
+            status: 'True'
+            type: Kapp-Controller-ReconcileSucceeded
+          - indicatesFailure: false
+            status: 'True'
+            type: Metrics-Server-ReconcileSucceeded
+          - indicatesFailure: false
+            status: 'True'
+            type: Pinniped-ReconcileSucceeded
+          - indicatesFailure: false
+            status: 'True'
+            type: Secretgen-Controller-ReconcileSucceeded
+          - indicatesFailure: false
+            status: 'True'
+            type: Vsphere-Cpi-ReconcileSucceeded
+          - indicatesFailure: false
+            type: Vsphere-Pv-Csi-ReconcileSucceeded
+            status: 'True'
+  cciNsRole:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - tkgClusterBootstrap
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      context: ${resource.cciNamespace.id}
+      manifest:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: job-role
+        rules:
+          - apiGroups:
+              - ''
+            resources:
+              - secrets
+            verbs:
+              - create
+              - get
+  cciNsServiceAccount:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - cciNsRole
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      context: ${resource.cciNamespace.id}
+      manifest:
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: job-sa
+  cciNsRolebinding:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - cciNsServiceAccount
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    properties:
+      context: ${resource.cciNamespace.id}
+      manifest:
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: job-rolebinding
+        subjects:
+          - kind: ServiceAccount
+            name: job-sa
+            namespace: ${input.namespaceName}
+        roleRef:
+          kind: Role
+          name: job-role
+          apiGroup: rbac.authorization.k8s.io
+  cciNgcSecret:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - cciNsRolebinding
+    metadata:
+      layoutPosition:
+        - 2
+        - 1
+    properties:
+      context: ${resource.cciNamespace.id}
+      manifest:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: nvaie-apikey
+        type: Opaque
+        stringData:
+          username: $oauthtoken
+          password: ${input.ngcPortalAccessKey}
+  cciNsgpuOperatorJob:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - cciNgcSecret
+    metadata:
+      layoutPosition:
+        - 3
+        - 1
+    createTimeout: 120m
+    properties:
+      context: ${resource.cciNamespace.id}
+      manifest:
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: install-gpu-and-rag-operator
+        spec:
+          template:
+            spec:
+              serviceAccountName: job-sa
+              containers:
+                - name: nvidia-driver-installer
+                  image: ${propgroup.vpaif_ag_properties.harbor}/${propgroup.vpaif_ag_properties.harborProject}/vra/tkg-gpu-console:v1.0
+                  command:
+                    - /bin/bash
+                    - '-c'
+                  args:
+                    - |
+                      export VERIFY_CHECKSUM=false
+
+                      # Function to fetch secrets
+                      fetch_secrets() {
+                        echo "Status: Fetching NGC API Key"
+                        export NGC_API_KEY=$(kubectl get secrets nvaie-apikey -o jsonpath='{.data.password}' | base64 -d)
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to retrieve NGC API key"
+                          exit 1
+                        fi
+
+                        export NGC_USER_EMAIL=vmware@broadcom.com
+                      }
+
+                      # Function to create client config token file
+                      create_client_config_token() {
+                        echo "Status: Creating client config token file"
+                        echo -n ${propgroup.vpaif_dl_vgpu_vpaif_quickstart_3.vgpu_license} > client_configuration_token.tok
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to create client configuration token"
+                          exit 1
+                        fi
+                      }
+
+                      # Function to download GPU operator script
+                      download_gpu_operator_script() {
+                        echo "Status: Downloading GPU operator script"
+                        NGC_CLI_URL="${propgroup.vpaif_ag_properties.httpServer}/gpu-operator-nvaie-6.1.sh"
+                        VALUES_URL="${propgroup.vpaif_ag_properties.httpServer}/gpu-operator-values.yaml"
+                        curl -kL --remote-header-name $NGC_CLI_URL -o gpu-operator-nvaie.sh
+                        # curl -kL --remote-header-name $VALUES_URL -o gpu-operator-values.yaml
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to download GPU installer script"
+                          exit 1
+                        fi
+                      }
+
+                      # Function to fetch TKG KubeConfig
+                      fetch_tkg_kubeconfig() {
+                        kubectl get secret kubernetes-cluster-kubeconfig -o jsonpath='{.data.value}' | base64 -d > tkgs-cluster-kubeconfig-admin
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to get TKG Kubeconfig"
+                          exit 1
+                        fi
+                      }
+
+                      # Function to execute GPU operator script
+                      execute_gpu_operator_script() {
+                        echo "Status: Installing GPU operator"
+                        export KUBECONFIG=./tkgs-cluster-kubeconfig-admin
+                        export VGPU_DRIVER_VERSION="570.124.06"
+                        export NVAIE_VERSION="6.1"
+                        export GPU_OPERATOR_VERSION="25.3.0"
+                        export PRIVATE_REGISTRY="${propgroup.vpaif_ag_properties.harbor}/${propgroup.vpaif_ag_properties.harborProject}"
+                        # export VALUES_FILE="gpu-operator-values.yaml"
+                        
+                        # pull helm chart
+                        helm pull oci://${propgroup.vpaif_ag_properties.harbor}/${propgroup.vpaif_ag_properties.harborProject}/gpu-operator --version=v$GPU_OPERATOR_VERSION --insecure-skip-tls-verify
+
+                        bash ./gpu-operator-nvaie.sh install
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to install GPU Operator"
+                          exit 1
+                        fi
+                      }
+
+                       # Function to determine if parameter is an integer
+                      is_integer() {
+                        [[ $1 =~ ^-?[0-9]+$ ]]
+                      }
+
+                      # Function to check GPU count
+                      check_gpu_count() {
+                        MAX_RETRIES=400
+                        RETRY_COUNT=0
+                        GPU_COUNT=null
+                        while [[ $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+                          GPU_COUNT=$(kubectl get nodes -l nvidia.com/gpu.present -o json | jq 'try .items[0].status.allocatable | try with_entries(select(.key | startswith("nvidia.com/"))) | try with_entries(select(.value != "0")) | .["nvidia.com/gpu"]' | tr -d '"')
+
+                          if is_integer $GPU_COUNT ; then
+                            echo "GPU count is $GPU_COUNT"
+                            break
+                          else
+                            sleep 10
+                            ((RETRY_COUNT++))
+                          fi
+                        done
+
+                        if ! is_integer $GPU_COUNT; then
+                          echo "Failure: GPU count is still null after maximum retries. Failing the job"
+                          exit 1
+                        fi
+
+                        if [[ $GPU_COUNT -eq 1 ]]; then
+                          create_time_slicing_config_map $GPU_COUNT
+                        fi
+                      }
+
+                      # Function to create ConfigMap
+                      create_ubuntu_repo_config_map() {
+                        echo "Status: Creating ubuntu repo file"
+                        printf "deb [arch=amd64] ${propgroup.vpaif_ag_properties.httpServer}/ubuntu jammy main universe\ndeb [arch=amd64] ${propgroup.vpaif_ag_properties.httpServer}/ubuntu jammy-updates main universe\ndeb [arch=amd64] ${propgroup.vpaif_ag_properties.httpServer}/ubuntu jammy-security main universe\n" > custom-repo.list
+                        
+                        kubectl create configmap repo-config -n gpu-operator --from-file=custom-repo.list
+                      }
+
+                      create_time_slicing_config_map() {
+                        echo "Status: Enabling GPU time slicing for $1 GPUs"
+
+                        GPU_COUNT=$1
+                        REPLICAS=1  # Default value
+
+                        if [ $GPU_COUNT -eq 1 ]; then
+                          REPLICAS=2
+                        fi
+
+                        printf "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: time-slicing-config-all\n  namespace: gpu-operator\ndata:\n  any: |-\n    version: v1\n    flags:\n      migStrategy: none\n    sharing:\n      timeSlicing:\n        resources:\n        - name: nvidia.com/gpu\n          replicas: $REPLICAS\n" > time-slicing-config.yaml
+
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to create ConfigMap time-slicing-config-all"
+                          exit 1
+                        fi
+
+                        kubectl apply -f time-slicing-config.yaml
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to create time-slicing configmap"
+                          exit 1
+                        fi
+
+                        kubectl patch clusterpolicy/cluster-policy -n gpu-operator --type merge -p '{"spec": {"devicePlugin": {"config": {"name": "time-slicing-config-all", "default": "any"}}}}'
+                        if [ $? -ne 0 ]; then
+                          echo "Failure: Failed to patch ClusterPolicy"
+                          exit 1
+                        fi
+
+                        # wait for time slicing to be applied
+                        wait_for_gpu_count $REPLICAS
+                      }
+
+                      # Function to wait for GPU count to reach the expected value
+                      wait_for_gpu_count() {
+                        EXPECTED_GPU_COUNT=$1
+                        RETRY_COUNT=0
+
+                        while [[ $RETRY_COUNT -lt 100 ]]; do
+                          CURRENT_GPU_COUNT=$(kubectl get nodes -l nvidia.com/gpu.present -o json | jq '.items[0].status.allocatable | with_entries(select(.key | startswith("nvidia.com/"))) | with_entries(select(.value != "0")) | .["nvidia.com/gpu"]' | tr -d '"')
+
+                          if [[ $CURRENT_GPU_COUNT == $EXPECTED_GPU_COUNT ]]; then
+                            echo "Success: GPU count is now $EXPECTED_GPU_COUNT"
+                            break
+                          fi
+
+                          sleep 10
+                          ((RETRY_COUNT++))
+                        done
+
+                        if [[ $CURRENT_GPU_COUNT != $EXPECTED_GPU_COUNT ]]; then
+                          echo "Failure: GPU count did not reach $EXPECTED_GPU_COUNT after maximum retries"
+                          exit 1
+                        fi
+                      }
+
+                      # Function to wait for daemonset to be ready
+                      wait_for_daemonset() {
+                        DAEMONSET_NAME="nvidia-operator-validator"
+                        NAMESPACE="gpu-operator"
+                        MAX_RETRIES=400
+                        RETRY_INTERVAL=10
+                        RETRY_COUNT=0
+                        DAEMONSET_COUNT=$(kubectl get daemonset $DAEMONSET_NAME -n $NAMESPACE -o json | jq .status.numberReady)
+                        while [[ $DAEMONSET_COUNT -lt 1 && $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+                          sleep $RETRY_INTERVAL
+                          DAEMONSET_COUNT=$(kubectl get daemonset $DAEMONSET_NAME -n $NAMESPACE -o json | jq .status.numberReady)
+                          ((RETRY_COUNT++))
+                        done
+
+                        if [[ $DAEMONSET_COUNT -lt 1 ]]; then
+                          echo "Failure: $DAEMONSET_NAME daemonset failed to come up in namespace $NAMESPACE"
+                          exit 1
+                        fi
+                      }
+
+                      # Function to validate Nvidia license
+                      validate_license() {
+                        DAEMONSET_NAME="nvidia-driver-daemonset"
+                        POD_NAME=$(kubectl get pods -n $NAMESPACE --selector=app=$DAEMONSET_NAME -o jsonpath='{.items[0].metadata.name}')
+                        license_info=$(kubectl -n $NAMESPACE exec $POD_NAME -- nvidia-smi -q | grep -m 1 'License Status')
+                        if [ $? -ne 0 ]; then
+                          echo "Failed to capture license info of GPU operator"
+                          exit 1
+                        fi
+
+                        expiry=$(echo "$license_info" | grep -oP '(?<=Expiry: ).* GMT')
+                        expiry_date=$(date -d "$expiry" +%s)
+                        current_date=$(date +%s)
+                        if [[ $expiry_date -le $current_date ]]; then
+                          echo "Failure: License has expired or will expire today."
+                          exit 1
+                        else
+                          echo "Status: Nvidia License is valid."
+                        fi
+                      }
+
+                      fetch_secrets
+                      create_client_config_token
+                      download_gpu_operator_script
+                      fetch_tkg_kubeconfig
+                      execute_gpu_operator_script
+                      create_ubuntu_repo_config_map
+                      check_gpu_count
+                      wait_for_daemonset
+                      validate_license
+              restartPolicy: Never
+          backoffLimit: 4
+      wait:
+        conditions:
+          - indicatesFailure: false
+            status: 'True'
+            type: Complete
+        fields:
+          - indicatesFailure: true
+            path: status.failed
+            value: '1'
+        executionLogs:
+          progressMessagePattern: Status:\s*(.*)
+          failureMessagePattern: Failure:\s*(.*)
+outputs:
+  __deploymentOverview:
+    value: |-
+      ### AirGapped AI Kubernetes Service
+
+      This deployment includes a Kubernetes cluster equipped with the NVIDIA GPU operator, which enables efficient management and utilization of GPU resources for compute-intensive workloads. The operator automates GPU management tasks and simplifies workload deployment, allowing for a seamless integration of GPU-accelerated computing into your Kubernetes environment.
+
+      #### Services
+      - Kubernetes - {{resource.tkg.object.spec.controlPlaneEndpoint.host}}:{{resource.tkg.object.spec.controlPlaneEndpoint.port}}
+
+      #### Kubernetes
+      - Login to Kubernetes via `kubectl`
+          ```
+          kubectl vsphere login --server={{resource.cciNamespace.metadata.[infrastructure.cci.vmware.com/wcp-address]}} --tanzu-kubernetes-cluster-name kubernetes-cluster --tanzu-kubernetes-cluster-namespace {{input.namespaceName}} --vsphere-username <username>
+          ```
+      - Manage Kubernetes and Supervisor Namespace via [Cloud Consumption Interface](/automation/#/service/catalog/consume/cci/projects/${env.projectName}/namespaces/{{resource.cciNamespace.name}}/summary)

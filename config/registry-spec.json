@@ -1,0 +1,11 @@
+{
+    "default_registry": false,
+    "image_registry": {
+        "certificate_chain": ${REGISTRY_CACERT},
+        "hostname": "${REGISTRY_NAME}",
+        "password": "${REGISTRY_PASSWORD}",
+        "port": 443,
+        "username": "${REGISTRY_USERNAME}"
+    },
+    "name": "${REGISTRY_NAME}"
+}
