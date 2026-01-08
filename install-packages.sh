@@ -3,25 +3,22 @@
 # ==============================================================================
 # VCF 9 & Private AI - Air Gap Preparation (Direct Artifactory Method)
 # ==============================================================================
-# REMEDIATION NOTES:
-# 1. Removes all Tanzu CLI references.
-# 2. Removes requirement for Broadcom Support Portal Token/Login.
-# 3. Uses direct 'packages.broadcom.com' Artifactory links (per KB 415112)
-#    to fetch VCF CLI and Offline Plugin Bundles.
-# 4. Prepares all artifacts locally for air-gapped usage.
+# FIXED:
+# 1. Corrected VCF CLI binary detection to handle 'vcf-cli-linux_amd64' naming.
+# 2. Uses direct Artifactory links (No Broadcom Portal Token required).
 # ==============================================================================
 
 set -e
 
 # --- Configuration ---
-# VCF 9.0.0 Direct Artifact URLs (Verified via KB 415112 patterns)
+# Direct URLs for VCF 9.0.0 (Verified from KB 415112 / User Testing)
 VCF_CLI_URL="https://packages.broadcom.com/artifactory/vcf-distro/vcf-cli/linux/amd64/v9.0.0/vcf-cli.tar.gz"
 VCF_PLUGIN_BUNDLE_URL="https://packages.broadcom.com/artifactory/vcf-distro/vcf-cli-plugins/v9.0.0/linux/amd64/plugins.tar.gz"
 
 DOWNLOAD_DIR="$HOME/vcf_airgap_prep"
 mkdir -p "$DOWNLOAD_DIR"
 
-echo "=== Starting VCF 9 Air-Gap Preparation (Token-Free Method) ==="
+echo "=== Starting VCF 9 Air-Gap Preparation ==="
 
 # 1. Update System & Install Dependencies
 echo "[1/6] Updating package list and installing base dependencies..."
@@ -75,26 +72,35 @@ sudo chmod +x /usr/bin/yq
 
 # 4. Fetch & Install VCF CLI (Direct Download)
 echo "[4/6] Downloading VCF 9 CLI from Artifactory..."
-# NOTE: Using direct URL to bypass Portal Auth
+# Download to a temporary filename to ensure we handle it correctly
 wget -c "$VCF_CLI_URL" -O "$DOWNLOAD_DIR/vcf-cli.tar.gz"
 
-echo "Extracting and Installing VCF CLI..."
-# Extract to temp location to find the binary
-mkdir -p "$DOWNLOAD_DIR/vcf_cli_extracted"
-tar -xvf "$DOWNLOAD_DIR/vcf-cli.tar.gz" -C "$DOWNLOAD_DIR/vcf_cli_extracted"
+echo "Extracting VCF CLI..."
+# Create a clean extraction directory
+CLI_EXTRACT_DIR="$DOWNLOAD_DIR/vcf_cli_extracted"
+rm -rf "$CLI_EXTRACT_DIR"
+mkdir -p "$CLI_EXTRACT_DIR"
 
-# Locate the 'vcf' binary (path inside tar may vary)
-VCF_BIN=$(find "$DOWNLOAD_DIR/vcf_cli_extracted" -type f -name "vcf" | head -n 1)
+# Extract
+tar -xvf "$DOWNLOAD_DIR/vcf-cli.tar.gz" -C "$CLI_EXTRACT_DIR"
+
+# Find the binary. It might be named 'vcf', 'vcf-cli', or 'vcf-cli-linux_amd64'
+# We look for any file in the extracted folder (excluding hidden ones)
+VCF_BIN=$(find "$CLI_EXTRACT_DIR" -maxdepth 2 -type f ! -name ".*" | head -n 1)
 
 if [ -z "$VCF_BIN" ]; then
-    echo "ERROR: Could not find 'vcf' binary in downloaded archive."
+    echo "ERROR: Could not find any binary in the extracted archive."
+    echo "Contents of $CLI_EXTRACT_DIR:"
+    ls -R "$CLI_EXTRACT_DIR"
     exit 1
 fi
 
+echo "Found binary: $VCF_BIN"
+echo "Installing to /usr/local/bin/vcf..."
 sudo cp "$VCF_BIN" /usr/local/bin/vcf
 sudo chmod +x /usr/local/bin/vcf
 
-echo "VCF CLI Installed:"
+echo "Verifying VCF CLI Installation:"
 vcf version
 
 # 5. Fetch & Install Offline Plugins (Direct Download)
@@ -104,11 +110,12 @@ wget -c "$VCF_PLUGIN_BUNDLE_URL" -O "$PLUGIN_BUNDLE"
 
 echo "Extracting Plugin Bundle for Local Install..."
 BUNDLE_EXTRACT_DIR="$DOWNLOAD_DIR/vcf_plugins_extracted"
+rm -rf "$BUNDLE_EXTRACT_DIR"
 mkdir -p "$BUNDLE_EXTRACT_DIR"
 tar -xvf "$PLUGIN_BUNDLE" -C "$BUNDLE_EXTRACT_DIR"
 
 echo "Installing Plugins from Local Source..."
-# This command installs all plugins from the offline bundle without checking online registries
+# Installs all plugins from the offline bundle
 vcf plugin install all --local-source "$BUNDLE_EXTRACT_DIR"
 
 echo "Verifying Plugin Installation..."
@@ -117,7 +124,7 @@ vcf plugin list
 # 6. Prepare Private AI Artifacts (Helm & Images)
 echo "[6/6] Pre-fetching Private AI Helm Charts..."
 
-# NVIDIA GPU Operator (Required for PAIF)
+# NVIDIA GPU Operator
 helm repo add nvidia https://helm.ngc.nvidia.com/nvidia
 helm repo update
 helm pull nvidia/gpu-operator --untar --untardir "$DOWNLOAD_DIR/charts"
@@ -126,22 +133,11 @@ echo "
 ==============================================================================
 AIR GAP PREPARATION COMPLETE
 ==============================================================================
-The VCF environment is now bootstrapped with:
-1. VCF CLI (v9.0.0)
-2. All VCF Plugins (Installed from Offline Bundle)
-3. Docker, Kubectl, Helm, yq
+1. VCF CLI installed successfully.
+2. VCF Plugins installed from offline bundle.
+3. Dependencies (Docker, Helm, Kubectl) ready.
 
-Artifacts stored in: $DOWNLOAD_DIR
-- vcf-cli.tar.gz
-- plugins.tar.gz
-- Extracted plugin source: $BUNDLE_EXTRACT_DIR
-- NVIDIA GPU Operator Charts: $DOWNLOAD_DIR/charts
-
-NOTE: 
-For the actual Private AI Foundation OVA/Images (Deep Learning VM),
-you must still manually move those files to:
-$DOWNLOAD_DIR
-(These specific OVAs are EULA-restricted and cannot be wget'd directly).
+Artifacts location: $DOWNLOAD_DIR
 ==============================================================================
 "
 sudo systemctl daemon-reload
