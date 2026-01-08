@@ -1,6 +1,6 @@
 supervisor-services-tar/*
 supervisor-services-yml/*
-tanzu-common-files-bin/*
+vcf-common-files-bin/*
 kubernetes-releases-ova/*
 dlvm-releases-ova/
 get_helm.sh
@@ -8,3 +8,5 @@ kubectl
 item.json
 resources/*
 certificates/*
+*.tar
+*.gz

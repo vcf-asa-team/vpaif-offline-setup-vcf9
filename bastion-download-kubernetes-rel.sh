@@ -39,17 +39,17 @@ echo "Cleaning up..."
 [ -d "${tkgrimage}" ] && rm -rf "${tkgrimage}"
 mv "${tkgrimage}".tar.gz "${DOWNLOAD_VKR_OVA}" 
 
-echo "Downloading DLVM"
-wget -q --show-progress --no-parent -r -nH --cut-dirs=2 --reject="index.html*" https://packages.vmware.com/dl-vm/common-container-nv-vgpu-ubuntu-2204-v20240814/
+# echo "Downloading DLVM"
+# wget -q --show-progress --no-parent -r -nH --cut-dirs=2 --reject="index.html*" https://packages.vmware.com/dl-vm/common-container-nv-vgpu-ubuntu-2204-v20240814/
 
-echo "Compressing downloaded files..."
-tar -cvzf common-container-nv-vgpu-ubuntu-2204-v20240814.tar.gz common-container-nv-vgpu-ubuntu-2204-v20240814*
+# echo "Compressing downloaded files..."
+# tar -cvzf common-container-nv-vgpu-ubuntu-2204-v20240814.tar.gz common-container-nv-vgpu-ubuntu-2204-v20240814*
 
-echo
-echo "Cleaning up..."
-mv common-container-nv-vgpu-ubuntu-2204-v20240814.tar.gz "${DOWNLOAD_DLVM_OVA}"
-# [ -d common-container-nv-vgpu-ubuntu-2204-v20240814 ] && 
-rm -rf common-container-nv-vgpu-ubuntu-2204-v20240814*
+# echo
+# echo "Cleaning up..."
+# mv common-container-nv-vgpu-ubuntu-2204-v20240814.tar.gz "${DOWNLOAD_DLVM_OVA}"
+# # [ -d common-container-nv-vgpu-ubuntu-2204-v20240814 ] && 
+# rm -rf common-container-nv-vgpu-ubuntu-2204-v20240814*
 
 # copy tar/yaml to admin host
 if [[ $SYNC_DIRECTORIES == "True" ]]; then

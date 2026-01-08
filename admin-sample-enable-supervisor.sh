@@ -6,40 +6,40 @@
 DEPLOYMENT_TYPE='NSX' # 'NSX' or 'VDS'
 
 VCENTER_VERSION=8 # set to 7 for vCenter 7
-VCENTER_HOSTNAME=chi-m03-vc02.set.lab
-VCENTER_USERNAME=administrator@vsphere.local
-VCENTER_PASSWORD='VMware@123!'
+VCENTER_HOSTNAME=rp-sm-n1-vc02.pse.lab
+VCENTER_USERNAME=administrator@wld.lab
+VCENTER_PASSWORD='VMware123!VMware123!'
 K8S_SUP_CLUSTER=airgapped  # Name of cluster where Supervisor is to be enabled
 K8S_CONTENT_LIBRARY=local-vks # Not required for 8.0 online install
 K8S_STORAGE_POLICY='vSAN Default Storage Policy'
-K8S_MGMT_PORTGROUP='airgap-airgapped-vds-01-pg-mgmt'
+K8S_MGMT_PORTGROUP='segment1-192.168.17.96'
 K8S_WKD0_PORTGROUP='Workload0-VDS-PG' # Not required for NSX 
 K8S_WKD1_PORTGROUP='Workload1-VDS-PG' # Not required for NSX
 
-export DNS_SERVER='172.21.0.90'
-export NTP_SERVER='172.29.0.50'
-export DNS_SEARCHDOMAIN='set.lab'
+export DNS_SERVER='172.29.172.107'
+export NTP_SERVER='192.168.245.252'
+export DNS_SEARCHDOMAIN='pse.lab'
 
-export MGMT_STARTING_IP='172.29.0.35'
-export MGMT_GATEWAY_IP='172.29.0.1'
-export MGMT_SUBNETMASK='255.255.255.0'
+export MGMT_STARTING_IP='192.168.17.121'
+export MGMT_GATEWAY_IP='192.168.17.97'
+export MGMT_SUBNETMASK='255.255.255.224'
 
 #### AVI specific details. Not required for NSX.
-export AVI_CLOUD='domain-c9'
+export AVI_CLOUD='domain-c10'
 export AVI_HOSTNAME=192.168.100.58
 export AVI_USERNAME=admin
 export AVI_PASSWORD='VMware1!'
 
 #### NSX specifc details, Not required for VDS. 
-export NSX_MANAGER='172.29.0.40'
+export NSX_MANAGER='172.30.132.67'
 export NSX_USERNAME='admin'
 export NSX_PASSWORD='VMware@123!VMware@123!'
-export NSX_EDGE_CLUSTER='vcf-w01-edge'
-export NSX_T0_GATEWAY='ag-t0'
-export NSX_DVS_PORTGROUP='airgap-airgapped-vds-01'
-export NSX_INGRESS_CIDR='172.22.0.0/22'
-export NSX_EGRESS_CIDR='172.22.10.0/23'
-export NSX_NAMESPACE_NETWORK='10.244.0.0/19'
+export NSX_EDGE_CLUSTER='wld.edge1a'
+export NSX_T0_GATEWAY='gw'
+export NSX_DVS_PORTGROUP='segment1-192.168.17.96'
+export NSX_INGRESS_CIDR='172.22.0.0/22' # not required?
+export NSX_EGRESS_CIDR='192.168.17.32/27'
+export NSX_NAMESPACE_NETWORK='10.10.0.0/16'
 
 ###################################################
 

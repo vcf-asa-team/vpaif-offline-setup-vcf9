@@ -17,7 +17,7 @@ cat > /etc/apt/mirror.list << EOF
 # set skel_path    $base_path/skel
 # set var_path     $base_path/var
 # set cleanscript $var_path/clean.sh
-# set defaultarch  <running host architecture>
+set defaultarch  amd64
 # set postmirror_script $var_path/postmirror.sh
 # set run_postmirror 0
 set base_path $BASTION_REPO_DIR
@@ -55,8 +55,8 @@ cd /var/tmp
 for p in "${1:-jammy}"{,-{security,updates,backports}}/{main,restricted,universe,multiverse}; do
   >&2 echo "${p}"
   wget -q -c -r -np -R "index.html*" "http://archive.ubuntu.com/ubuntu/dists/${p}/cnf/Commands-amd64.xz"
-  wget -q -c -r -np -R "index.html*" "http://archive.ubuntu.com/ubuntu/dists/${p}/cnf/Commands-i386.xz"
-  wget -q -c -r -np -R "index.html*" "http://archive.ubuntu.com/ubuntu/dists/${p}/binary-i386/"
+  # wget -q -c -r -np -R "index.html*" "http://archive.ubuntu.com/ubuntu/dists/${p}/cnf/Commands-i386.xz"
+  # wget -q -c -r -np -R "index.html*" "http://archive.ubuntu.com/ubuntu/dists/${p}/binary-i386/"
 done
 # Copy the downloaded files to the appropriate location
 
