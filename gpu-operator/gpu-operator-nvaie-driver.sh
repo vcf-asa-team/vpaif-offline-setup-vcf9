@@ -32,7 +32,7 @@
 ####
 set -u
 
-NGC_API_KEY=${NGC_API_KEY:-"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"}
+NGC_API_KEY=${NGC_API_KEY:-"nvapi-"}
 NGC_USER_EMAIL=${NGC_USER_EMAIL:-"blah@blah.com"}
 VGPU_DRIVER_VERSION=${VGPU_DRIVER_VERSION:-"580.105.08"}
 VGPU_DRIVER_NAME=${VGPU_DRIVER_NAME:-"vgpu-guest-driver"}
